@@ -19,8 +19,7 @@ const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 
 // Call DOM
-const activeCallOverlay = document.getElementById('active-call-overlay');
-const incomingCallModal = document.getElementById('incoming-call-modal');
+// Removed duplicated const declarations (activeCallOverlay, incomingCallModal) that exist in socket_webrtc.js
 const incomingName = document.getElementById('incoming-name');
 const incomingType = document.getElementById('incoming-type');
 const incomingAvatar = document.getElementById('incoming-avatar');
@@ -36,14 +35,28 @@ window.appState = {
 };
 
 // Start App Flow
-joinBtn.addEventListener('click', joinOrbit);
-usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') joinOrbit();
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("App DOM loaded, binding events...");
+    const joinBtn = document.getElementById('join-btn');
+    if(joinBtn) {
+        joinBtn.addEventListener('click', joinOrbit);
+    } else {
+        console.error("join-btn not found!");
+    }
+    
+    const usernameInput = document.getElementById('username-input');
+    if(usernameInput) {
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinOrbit();
+        });
+    }
 });
 
 function joinOrbit() {
     const val = usernameInput.value.trim();
+    console.log("joinOrbit clicked! Input value is:", val);
     if (val) {
+        console.log("Value is truthy, proceeding...");
         window.appState.username = val;
         myUsernameDisplay.textContent = val;
         myAvatarDisplay.textContent = val.charAt(0).toUpperCase();
