@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbit - Personal Chat & Call</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+    <!-- Username Prompt Modal -->
+    <div id="auth-modal" class="modal-overlay active">
+        <div class="modal auth-card glass-panel">
+            <div class="cube-icon">
+                <i class="ri-planet-line"></i>
+            </div>
+            <h2>Welcome to Orbit</h2>
+            <p>Enter a username to join the global nexus.</p>
+            <div class="input-group">
+                <i class="ri-user-line"></i>
+                <input type="text" id="username-input" placeholder="Your Username" autocomplete="off">
+            </div>
+            <button id="join-btn" class="btn-primary">Join Orbit</button>
+        </div>
+    </div>
+
+    <!-- Incoming Call Overlay -->
+    <div id="incoming-call-modal" class="modal-overlay">
+        <div class="modal call-card glass-panel">
+            <div class="caller-avatar" id="incoming-avatar">U</div>
+            <h2 id="incoming-name">User Name</h2>
+            <p id="incoming-type">is <span class="accent-text">video</span> calling you...</p>
+            <div class="call-actions">
+                <button id="accept-call-btn" class="btn-icon accept"><i class="ri-phone-fill"></i></button>
+                <button id="reject-call-btn" class="btn-icon reject"><i class="ri-phone-window-fill"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Call Interface (Hidden by default) -->
+    <div id="active-call-overlay" class="call-overlay">
+        <div class="video-container">
+            <!-- Remote Video (Big) -->
+            <video id="remote-video" autoplay playsinline></video>
+            <!-- Local Video (Small) -->
+            <video id="local-video" autoplay playsinline muted></video>
+            <!-- Audio elements fallback if video is false -->
+            <audio id="remote-audio" autoplay></audio>
+        </div>
+        <div class="call-controls glass-panel">
+            <div class="call-info">
+                <span id="call-partner">Partner</span>
+                <span class="call-duration" id="call-timer">00:00</span>
+            </div>
+            <div class="control-buttons">
+                <button id="toggle-mute-btn" class="btn-icon"><i class="ri-mic-fill"></i></button>
+                <button id="toggle-video-btn" class="btn-icon"><i class="ri-camera-fill"></i></button>
+                <button id="end-call-btn" class="btn-icon end"><i class="ri-phone-fill"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-container" class="app-container hidden">
+        
+        <!-- Sidebar: User List -->
+        <aside class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <i class="ri-planet-line"></i> Orbit
+                </div>
+                <div class="user-profile">
+                    <div class="avatar" id="my-avatar">U</div>
+                    <span id="my-username">My Name</span>
+                </div>
+            </div>
+            <div class="user-list-header">
+                <h3>Online Now</h3>
+                <span id="online-count" class="badge">0</span>
+            </div>
+            <ul id="user-list" class="user-list">
+                <!-- Users injected via JS -->
+            </ul>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <!-- Header -->
+            <header class="chat-header glass-panel hidden" id="chat-header">
+                <div class="chat-partner-info">
+                    <div class="avatar" id="partner-avatar">?</div>
+                    <div class="info">
+                        <h2 id="partner-username">Select a User</h2>
+                        <span class="status-indicator"></span>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <button class="btn-icon default-icon" id="start-audio-btn" title="Audio Call"><i class="ri-phone-line"></i></button>
+                    <button class="btn-icon default-icon" id="start-video-btn" title="Video Call"><i class="ri-video-chat-line"></i></button>
+                </div>
+            </header>
+
+            <!-- Placeholder when no user selected -->
+            <div id="no-chat-selected" class="no-chat-state">
+                <div class="empty-state-icon"><i class="ri-message-3-line"></i></div>
+                <h3>Your Messages</h3>
+                <p>Select a contact from the sidebar to start a conversation.</p>
+            </div>
+
+            <!-- Messages Container -->
+            <div id="messages-container" class="messages-container hidden">
+                <ul id="messages" class="messages-list">
+                    <!-- Messages injected via JS -->
+                </ul>
+            </div>
+
+            <!-- Message Input -->
+            <footer class="chat-footer glass-panel hidden" id="chat-footer">
+                <form id="message-form" class="message-form">
+                    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off">
+                    <button type="submit" class="btn-icon primary"><i class="ri-send-plane-fill"></i></button>
+                </form>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Socket.io Script via CDN as a standard practice for simple setups, or local via npm if served, but we use CDN for ease -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="assets/js/socket_webrtc.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
