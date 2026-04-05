@@ -32,6 +32,7 @@ const acceptCallBtn = document.getElementById('accept-call-btn');
 const rejectCallBtn = document.getElementById('reject-call-btn');
 
 let incomingCallData = null; // Stores offer until accepted
+let pendingCandidates = [];
 
 // 1. Initialize Socket
 window.connectSocket = function(username) {
@@ -105,17 +106,24 @@ window.connectSocket = function(username) {
     socket.on('answer', async (data) => {
         if (peerConnection) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            // Add queued candidates
+            for (let c of pendingCandidates) {
+                try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+            }
+            pendingCandidates = [];
             window.startCallTimer();
         }
     });
 
     socket.on('ice-candidate', async (data) => {
-        if (peerConnection) {
+        if (peerConnection && peerConnection.remoteDescription) {
             try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (e) {
                 console.error('Error adding received ice candidate', e);
             }
+        } else {
+            pendingCandidates.push(data.candidate);
         }
     });
 
@@ -176,6 +184,11 @@ acceptCallBtn.addEventListener('click', async () => {
     createPeerConnection();
 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.sdp));
+    // Add queued candidates
+    for (let c of pendingCandidates) {
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+    }
+    pendingCandidates = [];
     
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
@@ -234,12 +247,17 @@ function createPeerConnection() {
 
     // Listen for remote tracks
     peerConnection.ontrack = (event) => {
-        if (!remoteStream) {
-            remoteStream = new MediaStream();
-            remoteVideo.srcObject = remoteStream;
-            remoteAudio.srcObject = remoteStream;
+        if (event.streams && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            remoteAudio.srcObject = event.streams[0];
+        } else {
+            if (!remoteStream) {
+                remoteStream = new MediaStream();
+                remoteVideo.srcObject = remoteStream;
+                remoteAudio.srcObject = remoteStream;
+            }
+            remoteStream.addTrack(event.track);
         }
-        remoteStream.addTrack(event.track);
     };
 
     // ICE candidates
@@ -256,6 +274,7 @@ function createPeerConnection() {
 function cleanupCall() {
     activeCallOverlay.classList.remove('active');
     window.stopCallTimer();
+    pendingCandidates = [];
     
     if (peerConnection) {
         peerConnection.close();

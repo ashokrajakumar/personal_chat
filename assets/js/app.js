@@ -50,6 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') joinOrbit();
         });
     }
+
+    const mobileBackBtn = document.getElementById('mobile-back-btn');
+    if(mobileBackBtn) {
+        mobileBackBtn.addEventListener('click', () => {
+            appContainer.classList.remove('chat-active');
+        });
+    }
 });
 
 function joinOrbit() {
@@ -89,6 +96,8 @@ window.selectUserToChat = function(userId, userName) {
     chatHeader.classList.remove('hidden');
     messagesContainer.classList.remove('hidden');
     chatFooter.classList.remove('hidden');
+    
+    appContainer.classList.add('chat-active');
 
     // Clear old messages for now (since ephemeral and no DB per user built-in in this simple ui)
     // In a real app we'd load previous messages. Filtering is tricky without persistence.
