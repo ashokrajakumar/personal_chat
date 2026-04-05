@@ -29,12 +29,23 @@ io.on('connection', (socket) => {
     console.log(`${username} joined with ID: ${socket.id}`);
   });
 
-  // Handle instant one-to-one text messaging
+  // Handle instant one-to-one text messaging and global room
   socket.on('send-message', (data) => {
     // data expected: { to: 'target_socket_id', message: 'the text' }
+    if (data.to === 'global') {
+        socket.broadcast.emit('receive-message', {
+            from: 'global',
+            realFrom: socket.id,
+            fromName: onlineUsers[socket.id] || 'Unknown',
+            message: data.message
+        });
+        return;
+    }
+    
     if (data.to && data.to !== socket.id) {
        socket.to(data.to).emit('receive-message', {
          from: socket.id,
+         realFrom: socket.id,
          fromName: onlineUsers[socket.id] || 'Unknown',
          message: data.message
        });

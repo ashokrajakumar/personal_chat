@@ -31,8 +31,67 @@ const toggleVideoBtn = document.getElementById('toggle-video-btn');
 const acceptCallBtn = document.getElementById('accept-call-btn');
 const rejectCallBtn = document.getElementById('reject-call-btn');
 
+// Filter Elements
+const filterNoneBtn = document.getElementById('filter-none-btn');
+const filterBwBtn = document.getElementById('filter-bw-btn');
+const filterEmojiBtn = document.getElementById('filter-emoji-btn');
+
 let incomingCallData = null; // Stores offer until accepted
 let pendingCandidates = [];
+
+// Canvas Filter State
+let currentVideoFilter = 'none';
+let filterCanvas = document.createElement('canvas');
+let filterCtx = filterCanvas.getContext('2d');
+let rawVideoElement = document.createElement('video');
+rawVideoElement.autoplay = true;
+rawVideoElement.playsInline = true;
+rawVideoElement.muted = true;
+let filterAnimationFrameId = null;
+
+function processFilterFrame() {
+    if (!rawVideoElement.videoWidth) {
+        filterAnimationFrameId = requestAnimationFrame(processFilterFrame);
+        return;
+    }
+
+    if (filterCanvas.width !== rawVideoElement.videoWidth) {
+        filterCanvas.width = rawVideoElement.videoWidth;
+        filterCanvas.height = rawVideoElement.videoHeight;
+    }
+
+    if (currentVideoFilter === 'bw') {
+        filterCtx.filter = 'grayscale(100%) contrast(1.2)';
+    } else {
+        filterCtx.filter = 'none';
+    }
+    
+    filterCtx.drawImage(rawVideoElement, 0, 0, filterCanvas.width, filterCanvas.height);
+    filterCtx.filter = 'none';
+
+    if (currentVideoFilter === 'emoji') {
+        const time = Date.now() / 1000;
+        const x = filterCanvas.width / 2 + Math.sin(time * 2) * (filterCanvas.width/3);
+        const y = filterCanvas.height / 2 + Math.cos(time * 3) * (filterCanvas.height/3);
+        const x2 = filterCanvas.width / 2 + Math.cos(time * 1.5) * (filterCanvas.width/3);
+        const y2 = filterCanvas.height / 1.5 + Math.sin(time * 2.5) * (filterCanvas.height/3);
+        
+        filterCtx.font = "80px Arial";
+        filterCtx.fillText("🚀", x, y);
+        filterCtx.fillText("⭐", x2, y2);
+        filterCtx.fillText("👨‍🚀", filterCanvas.width/1.2, filterCanvas.height/1.2 + Math.sin(time*4)*20);
+    }
+    
+    filterAnimationFrameId = requestAnimationFrame(processFilterFrame);
+}
+
+if(filterNoneBtn) {
+    filterNoneBtn.onclick = () => { currentVideoFilter = 'none'; filterNoneBtn.style.display='none'; }
+    filterBwBtn.onclick = () => { currentVideoFilter = 'bw'; filterNoneBtn.style.display='inline-flex'; }
+    filterEmojiBtn.onclick = () => { currentVideoFilter = 'emoji'; filterNoneBtn.style.display='inline-flex'; }
+}
+
+let lastKnownUsers = [];
 
 // 1. Initialize Socket
 window.connectSocket = function(username) {
@@ -51,44 +110,83 @@ window.connectSocket = function(username) {
     });
 
     socket.on('update-users', (users) => {
+        lastKnownUsers = users;
         const list = document.getElementById('user-list');
         const count = document.getElementById('online-count');
         list.innerHTML = '';
-        
-        let othersCount = 0;
-        users.forEach(u => {
-            if (u.id !== socket.id) {
-                othersCount++;
-                const li = document.createElement('li');
-                li.className = 'user-item';
-                li.id = `user-${u.id}`;
-                // Preserve selection state
-                if (window.appState.selectedUser && window.appState.selectedUser.id === u.id) {
-                    li.classList.add('active');
-                }
-                
-                li.innerHTML = `
-                    <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
-                    <span>${u.name}</span>
-                `;
-                li.onclick = () => window.selectUserToChat(u.id, u.name);
-                list.appendChild(li);
+
+        const activeTab = window.appState && window.appState.activeTab ? window.appState.activeTab : 'public';
+        const others = users.filter(u => u.id !== socket.id);
+        count.textContent = others.length;
+
+        if (activeTab === 'public') {
+            // Public tab: show all online users as a read-only roster (no click to DM)
+            if (others.length === 0) {
+                const empty = document.createElement('li');
+                empty.style.cssText = 'padding:16px 20px; color:var(--text-secondary); font-size:0.85rem; text-align:center;';
+                empty.textContent = 'No one else is online yet...';
+                list.appendChild(empty);
+            } else {
+                others.forEach(u => {
+                    const li = document.createElement('li');
+                    li.className = 'user-item';
+                    li.style.opacity = '0.7';
+                    li.innerHTML = `
+                        <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <div>${u.name}</div>
+                            <div style="font-size:0.75rem; color:var(--success); display:flex; align-items:center; gap:4px;"><span style="width:6px;height:6px;background:var(--success);border-radius:50%;display:inline-block;"></span> Online</div>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                });
             }
-        });
-        count.textContent = othersCount;
+        } else {
+            // Personal tab: show clickable DM list
+            if (others.length === 0) {
+                const empty = document.createElement('li');
+                empty.style.cssText = 'padding:16px 20px; color:var(--text-secondary); font-size:0.85rem; text-align:center;';
+                empty.textContent = 'No one else is online. Share the link!';
+                list.appendChild(empty);
+            } else {
+                others.forEach(u => {
+                    const li = document.createElement('li');
+                    li.className = 'user-item';
+                    li.id = `user-${u.id}`;
+                    if (window.appState.selectedUser && window.appState.selectedUser.id === u.id) {
+                        li.classList.add('active');
+                    }
+                    li.innerHTML = `
+                        <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <div>${u.name}</div>
+                            <div style="font-size:0.75rem; color:var(--text-secondary);">Tap to message</div>
+                        </div>
+                    `;
+                    li.onclick = () => window.selectUserToChat(u.id, u.name);
+                    list.appendChild(li);
+                });
+            }
+        }
     });
 
     socket.on('receive-message', (data) => {
-        // Only show if it's from the currently selected user (or alert otherwise)
+        // Global message — show if on the public tab regardless of selectedUser
+        if (data.from === 'global') {
+            const isPublicTabActive = window.appState && window.appState.activeTab === 'public';
+            if (isPublicTabActive && window.appState.selectedUser && window.appState.selectedUser.id === 'global') {
+                window.appendMessage(data.fromName, data.message, 'received');
+            }
+            return;
+        }
+        // Private message
         if (window.appState.selectedUser && window.appState.selectedUser.id === data.from) {
             window.appendMessage(data.fromName, data.message, 'received');
         } else {
-            // Unobtrusive notification logic could go here
             console.log(`New message from ${data.fromName}: ${data.message}`);
-            // Auto open chat if none selected
             if (!window.appState.selectedUser) {
-                 window.selectUserToChat(data.from, data.fromName);
-                 setTimeout(() => window.appendMessage(data.fromName, data.message, 'received'), 50);
+                window.selectUserToChat(data.from, data.fromName);
+                setTimeout(() => window.appendMessage(data.fromName, data.message, 'received'), 50);
             }
         }
     });
@@ -131,6 +229,75 @@ window.connectSocket = function(username) {
         cleanupCall();
     });
 };
+
+// Allow tabs to force a re-render of the user list without a new server message
+window.refreshUserList = function() {
+    if (lastKnownUsers.length > 0 || true) {
+        // Simulate the update-users event with cached data
+        const fakeEvent = new CustomEvent('_refresh-users', { detail: lastKnownUsers });
+        document.dispatchEvent(fakeEvent);
+    }
+};
+
+document.addEventListener('_refresh-users', (e) => {
+    const users = e.detail;
+    const list = document.getElementById('user-list');
+    const count = document.getElementById('online-count');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const activeTab = window.appState && window.appState.activeTab ? window.appState.activeTab : 'public';
+    const others = users.filter(u => window.socket && u.id !== window.socket.id);
+    count.textContent = others.length;
+
+    if (activeTab === 'public') {
+        if (others.length === 0) {
+            const empty = document.createElement('li');
+            empty.style.cssText = 'padding:16px 20px; color:var(--text-secondary); font-size:0.85rem; text-align:center;';
+            empty.textContent = 'No one else is online yet...';
+            list.appendChild(empty);
+        } else {
+            others.forEach(u => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.style.opacity = '0.7';
+                li.innerHTML = `
+                    <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
+                    <div>
+                        <div>${u.name}</div>
+                        <div style="font-size:0.75rem; color:var(--success); display:flex; align-items:center; gap:4px;"><span style="width:6px;height:6px;background:var(--success);border-radius:50%;display:inline-block;"></span> Online</div>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+    } else {
+        if (others.length === 0) {
+            const empty = document.createElement('li');
+            empty.style.cssText = 'padding:16px 20px; color:var(--text-secondary); font-size:0.85rem; text-align:center;';
+            empty.textContent = 'No one else is online. Share the link!';
+            list.appendChild(empty);
+        } else {
+            others.forEach(u => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.id = `user-${u.id}`;
+                if (window.appState.selectedUser && window.appState.selectedUser.id === u.id) {
+                    li.classList.add('active');
+                }
+                li.innerHTML = `
+                    <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
+                    <div>
+                        <div>${u.name}</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">Tap to message</div>
+                    </div>
+                `;
+                li.onclick = () => window.selectUserToChat(u.id, u.name);
+                list.appendChild(li);
+            });
+        }
+    }
+});
 
 window.sendMessage = function(toId, message) {
     socket.emit('send-message', { to: toId, message: message });
@@ -220,9 +387,35 @@ endCallBtn.addEventListener('click', () => {
 async function initMedia(videoEnabled) {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({
-            video: videoEnabled ? true : false,
+            video: videoEnabled ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
             audio: true
         });
+        
+        if (videoEnabled) {
+            rawVideoElement.srcObject = localStream;
+            
+            // Wait for metadata to configure canvas
+            await new Promise(r => {
+                const handler = () => {
+                    filterCanvas.width = rawVideoElement.videoWidth;
+                    filterCanvas.height = rawVideoElement.videoHeight;
+                    rawVideoElement.removeEventListener('loadedmetadata', handler);
+                    r();
+                };
+                rawVideoElement.addEventListener('loadedmetadata', handler);
+            });
+            
+            if(!filterAnimationFrameId) processFilterFrame();
+            
+            let canvasStream = filterCanvas.captureStream(30);
+            const finalStream = new MediaStream();
+            finalStream.addTrack(canvasStream.getVideoTracks()[0]);
+            finalStream.addTrack(localStream.getAudioTracks()[0]);
+            
+            window.rawCameraStream = localStream; // Save original
+            localStream = finalStream;
+        }
+
         localVideo.srcObject = localStream;
         
         // Hide local video element if audio only to keep UI clean
@@ -275,10 +468,21 @@ function cleanupCall() {
     activeCallOverlay.classList.remove('active');
     window.stopCallTimer();
     pendingCandidates = [];
+    currentVideoFilter = 'none';
+    if(filterNoneBtn) filterNoneBtn.style.display = 'none';
+    
+    if (filterAnimationFrameId) {
+        cancelAnimationFrame(filterAnimationFrameId);
+        filterAnimationFrameId = null;
+    }
     
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
+    }
+    if (window.rawCameraStream) {
+        window.rawCameraStream.getTracks().forEach(track => track.stop());
+        window.rawCameraStream = null;
     }
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());

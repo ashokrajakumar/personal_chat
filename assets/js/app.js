@@ -57,6 +57,78 @@ document.addEventListener('DOMContentLoaded', () => {
             appContainer.classList.remove('chat-active');
         });
     }
+
+    // Logout logic
+    const logoutBtn = document.getElementById('logout-btn');
+    if(logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            // A hard reload is the safest way to destroy WebRTC connections, streams, and socket caches
+            window.location.reload();
+        });
+    }
+
+    // Emoji Picker Logic
+    const emojiBtn = document.getElementById('emoji-btn');
+    const emojiPickerContainer = document.getElementById('emoji-picker-container');
+    const msgInputBox = document.getElementById('message-input');
+    
+    if(emojiBtn && emojiPickerContainer) {
+        emojiBtn.addEventListener('click', () => {
+            emojiPickerContainer.classList.toggle('hidden');
+        });
+        
+        const picker = document.querySelector('emoji-picker');
+        if(picker) {
+            picker.addEventListener('emoji-click', event => {
+                msgInputBox.value += event.detail.unicode;
+                emojiPickerContainer.classList.add('hidden');
+                msgInputBox.focus();
+            });
+        }
+    }
+
+    // Tab Logic
+    window.appState.activeTab = 'public';
+    const tabPublic = document.getElementById('tab-public');
+    const tabPersonal = document.getElementById('tab-personal');
+    
+    if(tabPublic && tabPersonal) {
+        tabPublic.addEventListener('click', () => {
+            window.appState.activeTab = 'public';
+            tabPublic.classList.add('active');
+            tabPersonal.classList.remove('active');
+            const h3 = document.querySelector('.user-list-header h3');
+            if(h3) h3.textContent = 'Online Now';
+            
+            // Refresh user list rendering
+            if (typeof window.refreshUserList === 'function') window.refreshUserList();
+            
+            // Jump into Global Room
+            window.selectUserToChat('global', 'Global Fun Times Chat');
+        });
+        
+        tabPersonal.addEventListener('click', () => {
+            window.appState.activeTab = 'personal';
+            tabPersonal.classList.add('active');
+            tabPublic.classList.remove('active');
+            const h3 = document.querySelector('.user-list-header h3');
+            if(h3) h3.textContent = 'Direct Messages';
+            
+            // Refresh user list rendering
+            if (typeof window.refreshUserList === 'function') window.refreshUserList();
+            
+            // If they are in Global Room, unselect it
+            if (window.appState.selectedUser && window.appState.selectedUser.id === 'global') {
+                window.appState.selectedUser = null;
+                document.getElementById('no-chat-selected').style.display = 'flex';
+                document.getElementById('chat-header').classList.add('hidden');
+                document.getElementById('messages-container').classList.add('hidden');
+                document.getElementById('chat-footer').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('chat-active');
+            }
+        });
+    }
+
 });
 
 function joinOrbit() {
@@ -76,18 +148,41 @@ function joinOrbit() {
         if (typeof window.connectSocket === 'function') {
             window.connectSocket(val);
         }
+
+        // Auto-open public room after brief delay for socket to connect
+        setTimeout(() => {
+            window.selectUserToChat('global', 'Global Fun Times Chat');
+        }, 600);
     }
 }
 
 // Select a user to chat with
 window.selectUserToChat = function(userId, userName) {
-    if (userId === window.socket.id) return; // Don't chat with self
+    if (window.socket && userId === window.socket.id) return; // Don't chat with self
     
     window.appState.selectedUser = { id: userId, name: userName };
     
+    // Auto-switch tab based on who we clicked
+    const tabPublic = document.getElementById('tab-public');
+    const tabPersonal = document.getElementById('tab-personal');
+    if (userId === 'global' && tabPublic) {
+        tabPublic.classList.add('active');
+        if (tabPersonal) tabPersonal.classList.remove('active');
+        window.appState.activeTab = 'public';
+        const h3 = document.querySelector('.user-list-header h3');
+        if (h3) h3.textContent = 'Online Now';
+    } else if (userId !== 'global' && tabPersonal) {
+        tabPersonal.classList.add('active');
+        if (tabPublic) tabPublic.classList.remove('active');
+        window.appState.activeTab = 'personal';
+        const h3 = document.querySelector('.user-list-header h3');
+        if (h3) h3.textContent = 'Direct Messages';
+    }
+    
     // Update UI
     document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
-    document.getElementById(`user-${userId}`).classList.add('active');
+    const userEl = document.getElementById(`user-${userId}`);
+    if (userEl) userEl.classList.add('active');
 
     partnerUsername.textContent = userName;
     partnerAvatar.textContent = userName.charAt(0).toUpperCase();
@@ -98,6 +193,10 @@ window.selectUserToChat = function(userId, userName) {
     chatFooter.classList.remove('hidden');
     
     appContainer.classList.add('chat-active');
+
+    // Cannot call the Global Room natively yet
+    document.getElementById('start-audio-btn').style.display = userId === 'global' ? 'none' : 'inline-flex';
+    document.getElementById('start-video-btn').style.display = userId === 'global' ? 'none' : 'inline-flex';
 
     // Clear old messages for now (since ephemeral and no DB per user built-in in this simple ui)
     // In a real app we'd load previous messages. Filtering is tricky without persistence.
@@ -115,7 +214,20 @@ window.appendMessage = function(fromName, message, type) { // type: 'sent' | 're
     // Safety against XSS simply using textContent
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
-    bubble.textContent = message;
+
+    // Show sender name if it's the global room and we received it
+    if (type === 'received' && window.appState.selectedUser && window.appState.selectedUser.id === 'global') {
+        const nameSpan = document.createElement('div');
+        nameSpan.style.fontSize = '0.75rem';
+        nameSpan.style.color = 'var(--text-secondary)';
+        nameSpan.style.marginBottom = '4px';
+        nameSpan.style.fontWeight = 'bold';
+        nameSpan.textContent = fromName;
+        bubble.appendChild(nameSpan);
+    }
+
+    const textNode = document.createTextNode(message);
+    bubble.appendChild(textNode);
 
     const timeSpan = document.createElement('span');
     timeSpan.className = 'msg-time';

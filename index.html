@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orbit - Personal Chat & Call</title>
+    <title>Fun Times - Personal Chat & Call</title>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
@@ -12,19 +12,28 @@
 </head>
 <body>
 
+    <!-- Cinematic Background -->
+    <div id="space-bg">
+        <div class="aurora"></div>
+        <div class="aurora aurora-2"></div>
+        <div class="orbit-ring"></div>
+        <div class="orbit-ring ring-2"></div>
+        <div class="orbit-ring ring-3"></div>
+    </div>
+
     <!-- Username Prompt Modal -->
     <div id="auth-modal" class="modal-overlay active">
         <div class="modal auth-card glass-panel">
             <div class="cube-icon">
                 <i class="ri-planet-line"></i>
             </div>
-            <h2>Welcome to Orbit</h2>
+            <h2>Welcome to Fun Times</h2>
             <p>Enter a username to join the global nexus.</p>
             <div class="input-group">
                 <i class="ri-user-line"></i>
                 <input type="text" id="username-input" placeholder="Your Username" autocomplete="off">
             </div>
-            <button id="join-btn" class="btn-primary">Join Orbit</button>
+            <button id="join-btn" class="btn-primary">Join Fun Times</button>
         </div>
     </div>
 
@@ -57,6 +66,12 @@
                 <span class="call-duration" id="call-timer">00:00</span>
             </div>
             <div class="control-buttons">
+                <button id="filter-none-btn" class="btn-icon default-icon" title="Clear Filters" style="display:none;"><i class="ri-user-smile-line"></i></button>
+                <button id="filter-bw-btn" class="btn-icon default-icon" title="B&W Filter"><i class="ri-contrast-drop-2-line"></i></button>
+                <button id="filter-emoji-btn" class="btn-icon default-icon" title="Emoji Filter"><i class="ri-bear-smile-line"></i></button>
+                
+                <div style="width:1px; background:rgba(255,255,255,0.2); margin:0 5px;"></div>
+                
                 <button id="toggle-mute-btn" class="btn-icon"><i class="ri-mic-fill"></i></button>
                 <button id="toggle-video-btn" class="btn-icon"><i class="ri-camera-fill"></i></button>
                 <button id="end-call-btn" class="btn-icon end"><i class="ri-phone-fill"></i></button>
@@ -71,14 +86,22 @@
         <aside class="sidebar glass-panel">
             <div class="sidebar-header">
                 <div class="brand">
-                    <i class="ri-planet-line"></i> Orbit
+                    <i class="ri-planet-line"></i> Fun Times
                 </div>
                 <div class="user-profile">
                     <div class="avatar" id="my-avatar">U</div>
                     <span id="my-username">My Name</span>
+                    <button class="btn-icon default-icon" id="logout-btn" style="margin-left: auto; width: 32px; height: 32px; font-size: 1rem;" title="Logout"><i class="ri-logout-circle-r-line"></i></button>
                 </div>
             </div>
-            <div class="user-list-header">
+            
+            <!-- Sidebar Tabs -->
+            <div class="sidebar-tabs">
+                <button id="tab-public" class="sidebar-tab active">Public Zone</button>
+                <button id="tab-personal" class="sidebar-tab">Personal</button>
+            </div>
+
+            <div class="user-list-header" style="padding-top: 10px;">
                 <h3>Online Now</h3>
                 <span id="online-count" class="badge">0</span>
             </div>
@@ -121,7 +144,11 @@
 
             <!-- Message Input -->
             <footer class="chat-footer glass-panel hidden" id="chat-footer">
+                <div id="emoji-picker-container" class="hidden" style="position: absolute; bottom: 85px; right: 30px; z-index: 100;">
+                    <emoji-picker class="dark"></emoji-picker>
+                </div>
                 <form id="message-form" class="message-form">
+                    <button type="button" class="btn-icon default-icon" id="emoji-btn" title="Add Emoji" style="background:transparent;"><i class="ri-emotion-line"></i></button>
                     <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off">
                     <button type="submit" class="btn-icon primary"><i class="ri-send-plane-fill"></i></button>
                 </form>
@@ -129,7 +156,8 @@
         </main>
     </div>
 
-    <!-- Socket.io Script via CDN as a standard practice for simple setups, or local via npm if served, but we use CDN for ease -->
+    <!-- Web Components & Socket API -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="assets/js/socket_webrtc.js" defer></script>
     <script src="assets/js/app.js" defer></script>
