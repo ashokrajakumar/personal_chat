@@ -35,10 +35,11 @@ let incomingCallData = null; // Stores offer until accepted
 
 // 1. Initialize Socket
 window.connectSocket = function(username) {
-    // Dynamically connect to the same IP/Domain hosting the website on port 3000
+    // Dynamically connect to the right URL based on environment
+    // Use the explicit Render URL for production so it works even if this frontend is loaded from a separate PHP domain
     const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
         ? 'http://localhost:3000' 
-        : `http://${window.location.hostname}:3000`;
+        : 'https://personal-chat-nim1.onrender.com';
     
     socket = io(serverUrl);
 
