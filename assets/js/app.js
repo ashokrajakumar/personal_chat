@@ -73,15 +73,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const msgInputBox = document.getElementById('message-input');
     
     if(emojiBtn && emojiPickerContainer) {
+        // Force hidden on start using style (no global .hidden CSS rule exists)
+        emojiPickerContainer.style.display = 'none';
+
         emojiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            emojiPickerContainer.classList.toggle('hidden');
+            const isVisible = emojiPickerContainer.style.display !== 'none';
+            emojiPickerContainer.style.display = isVisible ? 'none' : 'block';
         });
         
         // Close picker when clicking outside
         document.addEventListener('click', (e) => {
             if (!emojiPickerContainer.contains(e.target) && e.target !== emojiBtn) {
-                emojiPickerContainer.classList.add('hidden');
+                emojiPickerContainer.style.display = 'none';
             }
         });
         
@@ -92,14 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 picker.addEventListener('emoji-click', event => {
                     const input = document.getElementById('message-input');
                     if (input) {
-                        const pos = input.selectionStart || input.value.length;
+                        const pos = (input.selectionStart != null) ? input.selectionStart : input.value.length;
                         input.value = input.value.slice(0, pos) + event.detail.unicode + input.value.slice(pos);
-                        // Move cursor after inserted emoji
                         const newPos = pos + event.detail.unicode.length;
-                        input.setSelectionRange(newPos, newPos);
+                        requestAnimationFrame(() => {
+                            input.focus();
+                            input.setSelectionRange(newPos, newPos);
+                        });
                     }
-                    emojiPickerContainer.classList.add('hidden');
-                    document.getElementById('message-input').focus();
+                    emojiPickerContainer.style.display = 'none';
                 });
             }
         });
