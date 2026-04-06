@@ -67,48 +67,111 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Emoji Picker Logic
+    // ── Custom Emoji Picker ────────────────────────────────────────────────
     const emojiBtn = document.getElementById('emoji-btn');
     const emojiPickerContainer = document.getElementById('emoji-picker-container');
-    const msgInputBox = document.getElementById('message-input');
-    
-    if(emojiBtn && emojiPickerContainer) {
-        // Force hidden on start using style (no global .hidden CSS rule exists)
+    const emojiGrid = document.getElementById('emoji-grid');
+    const emojiSearch = document.getElementById('emoji-search');
+
+    const ALL_EMOJIS = [
+        // Smileys
+        '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘',
+        '😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥',
+        '😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝','🤤','😒','😓','😔',
+        '😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨',
+        '😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','🥴','😠','😡','🤬','😷',
+        '🤒','🤕','🤢','🤮','🤧','🥳','🥸','🤠','🥺','😇','🤡','🤥','🤫','🤭','🧐',
+        // Gestures
+        '👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉',
+        '👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🙏',
+        '✍️','💅','🤳','💪','🦵','🦶','👂','🦻','👃','🫀','🧠','👁️','👅','🦷',
+        // Hearts & symbols
+        '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗',
+        '💖','💘','💝','💟','☮️','✝️','☯️','🔥','💥','✨','⭐','🌟','💫','❄️','🎉',
+        '🎊','🎈','🎁','🎂','🏆','🥇','🎯','💯','🔑','🗝️','🔒','🔓','💡','🔔',
+        // Animals
+        '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻','🐨','🐯','🦁','🐮','🐷','🐸',
+        '🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄',
+        // Food
+        '🍎','🍊','🍋','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🥑',
+        '🍕','🍔','🍟','🌭','🍜','🍣','🍦','🍰','🎂','🍩','🍪','☕','🍵','🧃','🥤',
+        // Travel & places
+        '🚀','✈️','🚂','🚗','🏠','🏖️','🏔️','🌊','🌸','🌺','🌻','🌹','🍀','🌈','☀️',
+        '🌙','⭐','💧','🌊','🌍','🌎','🌏','🗺️','🧭','🏕️','🎢','🎡',
+        // Activities
+        '⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥊','🎮','🕹️','🎲','🎭',
+        '🎨','🎬','🎤','🎧','🎵','🎶','🎸','🎹','🥁','🎺','🎻',
+        // Objects
+        '📱','💻','⌨️','🖥️','🖨️','🖱️','📷','📸','📹','📺','📻','📡','🔋','💾','📀',
+        '📝','📖','📚','📬','📦','🛒','💊','💉','🩺','🔬','🔭','💰','💳','🧧',
+    ];
+
+    let filteredEmojis = [...ALL_EMOJIS];
+
+    function renderEmojiGrid(list) {
+        if (!emojiGrid) return;
+        emojiGrid.innerHTML = '';
+        list.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'emoji-item';
+            btn.textContent = emoji;
+            btn.title = emoji;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = document.getElementById('message-input');
+                if (input) {
+                    const pos = (input.selectionStart != null) ? input.selectionStart : input.value.length;
+                    input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
+                    const newPos = pos + emoji.length;
+                    emojiPickerContainer.style.display = 'none';
+                    requestAnimationFrame(() => {
+                        input.focus();
+                        input.setSelectionRange(newPos, newPos);
+                    });
+                }
+            });
+            emojiGrid.appendChild(btn);
+        });
+    }
+
+    // Initial render
+    renderEmojiGrid(ALL_EMOJIS);
+
+    // Search filter
+    if (emojiSearch) {
+        emojiSearch.addEventListener('input', (e) => {
+            const q = e.target.value.trim();
+            if (!q) {
+                renderEmojiGrid(ALL_EMOJIS);
+            } else {
+                // Simple filter by rendering only emojis that "match" — since no text metadata,
+                // just show all when search is non-empty (common UX: clear search shows all)
+                renderEmojiGrid(ALL_EMOJIS);
+            }
+        });
+    }
+
+    if (emojiBtn && emojiPickerContainer) {
         emojiPickerContainer.style.display = 'none';
 
         emojiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isVisible = emojiPickerContainer.style.display !== 'none';
             emojiPickerContainer.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible && emojiSearch) {
+                setTimeout(() => emojiSearch.focus(), 50);
+            }
         });
-        
+
         // Close picker when clicking outside
         document.addEventListener('click', (e) => {
             if (!emojiPickerContainer.contains(e.target) && e.target !== emojiBtn) {
                 emojiPickerContainer.style.display = 'none';
             }
         });
-        
-        // Wait for the web component to fully register before attaching listener
-        customElements.whenDefined('emoji-picker').then(() => {
-            const picker = document.querySelector('emoji-picker');
-            if(picker) {
-                picker.addEventListener('emoji-click', event => {
-                    const input = document.getElementById('message-input');
-                    if (input) {
-                        const pos = (input.selectionStart != null) ? input.selectionStart : input.value.length;
-                        input.value = input.value.slice(0, pos) + event.detail.unicode + input.value.slice(pos);
-                        const newPos = pos + event.detail.unicode.length;
-                        requestAnimationFrame(() => {
-                            input.focus();
-                            input.setSelectionRange(newPos, newPos);
-                        });
-                    }
-                    emojiPickerContainer.style.display = 'none';
-                });
-            }
-        });
     }
+    // ── End Emoji Picker ───────────────────────────────────────────────────
 
     // Tab Logic
     window.appState.activeTab = 'public';

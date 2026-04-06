@@ -146,7 +146,12 @@
             <!-- Message Input -->
             <footer class="chat-footer glass-panel hidden" id="chat-footer">
                 <div id="emoji-picker-container">
-                    <emoji-picker class="dark"></emoji-picker>
+                    <div class="custom-emoji-picker">
+                        <div class="emoji-search-wrap">
+                            <input type="text" id="emoji-search" placeholder="🔍 Search emoji..." autocomplete="off">
+                        </div>
+                        <div class="emoji-grid" id="emoji-grid"></div>
+                    </div>
                 </div>
                 <form id="message-form" class="message-form">
                     <button type="button" class="btn-icon default-icon" id="emoji-btn" title="Add Emoji" style="background:transparent;"><i class="ri-emotion-line"></i></button>
@@ -157,8 +162,7 @@
         </main>
     </div>
 
-    <!-- Web Components & Socket API -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1"></script>
+    <!-- Socket API & App Scripts -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="assets/js/socket_webrtc.js" defer></script>
     <script src="assets/js/app.js" defer></script>
