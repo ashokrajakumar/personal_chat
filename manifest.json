@@ -1,0 +1,17 @@
+{
+  "name": "Fun Times Chat",
+  "short_name": "FunTimes",
+  "description": "Premium real-time chat with audio and video calls.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0f1a",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968756.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

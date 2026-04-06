@@ -104,6 +104,69 @@ function updateFilterVisibility(isVideo) {
     }
 }
 
+// 5. Screen Share Logic
+let screenStream = null;
+const toggleScreenBtn = document.getElementById('toggle-screen-btn');
+
+async function toggleScreenShare() {
+    if (!peerConnection) return;
+
+    if (!screenStream) {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const screenTrack = screenStream.getVideoTracks()[0];
+            
+            // Replace local video track in peer connection
+            const senders = peerConnection.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            
+            if (videoSender) {
+                videoSender.replaceTrack(screenTrack);
+            }
+
+            // Also update local preview
+            localVideo.srcObject = screenStream;
+            toggleScreenBtn.classList.add('active');
+            toggleScreenBtn.style.color = 'var(--accent)';
+
+            // Handle user clicking "Stop Sharing" in browser UI
+            screenTrack.onended = () => {
+                stopScreenShare();
+            };
+        } catch (err) {
+            console.error("Screen share error:", err);
+        }
+    } else {
+        stopScreenShare();
+    }
+}
+
+async function stopScreenShare() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+    
+    // Switch back to camera if possible
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        const senders = peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video' || s.track === null);
+        
+        if (videoSender && videoTrack) {
+            videoSender.replaceTrack(videoTrack);
+        }
+        localVideo.srcObject = localStream;
+    }
+    
+    toggleScreenBtn.classList.remove('active');
+    toggleScreenBtn.style.color = '#fff';
+}
+
+if (toggleScreenBtn) {
+    toggleScreenBtn.addEventListener('click', toggleScreenShare);
+}
+
 function processFilterFrame() {
     if (!rawVideoElement.videoWidth) {
         filterAnimationFrameId = requestAnimationFrame(processFilterFrame);
@@ -162,6 +225,9 @@ window.connectSocket = function(username) {
 
     socket.on('connect', () => {
         socket.emit('join', username);
+        if (typeof window.handleGlobalSocketEvents === 'function') {
+            window.handleGlobalSocketEvents(socket);
+        }
     });
 
     socket.on('update-users', (users) => {
@@ -211,12 +277,14 @@ window.connectSocket = function(username) {
                     if (window.appState.selectedUser && window.appState.selectedUser.id === u.id) {
                         li.classList.add('active');
                     }
+                    const unread = window.appState.unreadCounts[u.id] || 0;
                     li.innerHTML = `
                         <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
-                        <div>
+                        <div style="flex:1;">
                             <div>${u.name}</div>
                             <div style="font-size:0.75rem; color:var(--text-secondary);">Tap to message</div>
                         </div>
+                        ${unread > 0 ? `<span class="badge" style="background:var(--accent); color:white;">${unread}</span>` : ''}
                     `;
                     li.onclick = () => window.selectUserToChat(u.id, u.name);
                     list.appendChild(li);
@@ -239,10 +307,26 @@ window.connectSocket = function(username) {
             window.appendMessage(data.fromName, data.message, 'received');
         } else {
             console.log(`New message from ${data.fromName}: ${data.message}`);
+            // Increment unread count
+            window.appState.unreadCounts[data.from] = (window.appState.unreadCounts[data.from] || 0) + 1;
+            window.refreshUserList();
+            
+            // Still append if no user selected at all (legacy behavior)
             if (!window.appState.selectedUser) {
                 window.selectUserToChat(data.from, data.fromName);
                 setTimeout(() => window.appendMessage(data.fromName, data.message, 'received'), 50);
             }
+        }
+    });
+
+    socket.on('receive-file', (data) => {
+        // data: { from, fromName, fileName, fileType, fileData }
+        if (window.appState.selectedUser && (window.appState.selectedUser.id === data.from || data.from === 'global')) {
+            window.appendFileMessage(data.fromName, data.fileName, data.fileType, data.fileData, 'received');
+        } else {
+            // Increment unread count
+            window.appState.unreadCounts[data.from] = (window.appState.unreadCounts[data.from] || 0) + 1;
+            window.refreshUserList();
         }
     });
 
@@ -341,12 +425,14 @@ document.addEventListener('_refresh-users', (e) => {
                 if (window.appState.selectedUser && window.appState.selectedUser.id === u.id) {
                     li.classList.add('active');
                 }
+                const unread = window.appState.unreadCounts[u.id] || 0;
                 li.innerHTML = `
                     <div class="avatar">${u.name.charAt(0).toUpperCase()}</div>
-                    <div>
+                    <div style="flex:1;">
                         <div>${u.name}</div>
                         <div style="font-size:0.75rem; color:var(--text-secondary);">Tap to message</div>
                     </div>
+                    ${unread > 0 ? `<span class="badge" style="background:var(--accent); color:white;">${unread}</span>` : ''}
                 `;
                 li.onclick = () => window.selectUserToChat(u.id, u.name);
                 list.appendChild(li);

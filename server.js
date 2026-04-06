@@ -47,9 +47,53 @@ io.on('connection', (socket) => {
          from: socket.id,
          realFrom: socket.id,
          fromName: onlineUsers[socket.id] || 'Unknown',
-         message: data.message
+         message: data.message,
+         timestamp: Date.now()
        });
     }
+  });
+
+  socket.on('send-file', (data) => {
+    // data: { to, fileName, fileType, fileData }
+    const payload = {
+        from: socket.id,
+        fromName: onlineUsers[socket.id] || 'Unknown',
+        fileName: data.fileName,
+        fileType: data.fileType,
+        fileData: data.fileData,
+        timestamp: Date.now()
+    };
+
+    if (data.to === 'global') {
+        socket.broadcast.emit('receive-file', { ...payload, from: 'global' });
+    } else {
+        socket.to(data.to).emit('receive-file', payload);
+    }
+  });
+
+  // Real-time Chat Context (Typing / Seen)
+  socket.on('typing', (data) => {
+      // data: { to: 'id' }
+      if (data.to === 'global') {
+          socket.broadcast.emit('user-typing', { from: socket.id, fromName: onlineUsers[socket.id] });
+      } else {
+          socket.to(data.to).emit('user-typing', { from: socket.id, fromName: onlineUsers[socket.id] });
+      }
+  });
+
+  socket.on('stop-typing', (data) => {
+      if (data.to === 'global') {
+          socket.broadcast.emit('user-stop-typing', { from: socket.id });
+      } else {
+          socket.to(data.to).emit('user-stop-typing', { from: socket.id });
+      }
+  });
+
+  socket.on('message-seen', (data) => {
+      // data: { to: 'id' }
+      if (data.to !== 'global') {
+          socket.to(data.to).emit('message-seen', { from: socket.id });
+      }
   });
 
   // --- WebRTC Signaling ---

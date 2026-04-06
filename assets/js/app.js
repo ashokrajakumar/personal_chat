@@ -25,13 +25,22 @@ const incomingType = document.getElementById('incoming-type');
 const incomingAvatar = document.getElementById('incoming-avatar');
 const callPartnerDisplay = document.getElementById('call-partner');
 const callTimerDisplay = document.getElementById('call-timer');
+const typingIndicator = document.getElementById('typing-indicator');
+
+// Notification Sound Init
+const notifSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_06d86236b2.mp3?filename=notification-9-158196.mp3'); // subtle pop
+notifSound.volume = 0.5;
 
 // Global App State
 window.appState = {
     username: '',
     selectedUser: null, // {id, name}
     callTimerInterval: null,
-    callSeconds: 0
+    callSeconds: 0,
+    isTyping: false,
+    typingTimeout: null,
+    onlineUsers: [],
+    unreadCounts: {} // {userId: count}
 };
 
 // Start App Flow
@@ -215,6 +224,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Typing Status Logic
+    const msgInput = document.getElementById('message-input');
+    if (msgInput) {
+        msgInput.addEventListener('input', () => {
+            if (!window.appState.selectedUser) return;
+            
+            if (!window.appState.isTyping) {
+                window.appState.isTyping = true;
+                if (window.socket) window.socket.emit('typing', { to: window.appState.selectedUser.id });
+            }
+            
+            clearTimeout(window.appState.typingTimeout);
+            window.appState.typingTimeout = setTimeout(() => {
+                window.appState.isTyping = false;
+                if (window.socket) window.socket.emit('stop-typing', { to: window.appState.selectedUser.id });
+            }, 3000);
+        });
+    }
+
+    // Request Notification Permission
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+
+    // File Input Logic
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Limit to 5MB
+            if (file.size > 5 * 1024 * 1024) {
+                alert("File too large! Max 5MB.");
+                fileInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const fileData = event.target.result;
+                if (window.appState.selectedUser) {
+                    // Send via socket
+                    if (window.socket) {
+                        window.socket.emit('send-file', {
+                            to: window.appState.selectedUser.id,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileData: fileData
+                        });
+                        window.appendFileMessage(window.appState.username, file.name, file.type, fileData, 'sent');
+                    }
+                }
+                fileInput.value = '';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Wallpaper Logic
+    const wpBtn = document.getElementById('wallpaper-menu-btn');
+    const wpDropdown = document.getElementById('wallpaper-dropdown');
+    const msgContainer = document.getElementById('messages-container');
+
+    if (wpBtn && wpDropdown && msgContainer) {
+        wpBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            wpDropdown.classList.toggle('active');
+        });
+
+        document.addEventListener('click', () => {
+            wpDropdown.classList.remove('active');
+        });
+
+        document.querySelectorAll('.wallpaper-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                const bg = e.target.getAttribute('data-bg');
+                msgContainer.style.background = bg;
+                wpDropdown.classList.remove('active');
+            });
+        });
+    }
+
 });
 
 function joinOrbit() {
@@ -280,13 +372,25 @@ window.selectUserToChat = function(userId, userName) {
     
     appContainer.classList.add('chat-active');
 
+    // Notify server we've seen messages from this user (Read Receipts)
+    if (window.socket && userId !== 'global') {
+        window.socket.emit('message-seen', { to: userId });
+    }
+
+    // Clear unread count for this user
+    if (window.appState.unreadCounts[userId]) {
+        delete window.appState.unreadCounts[userId];
+        if (typeof window.refreshUserList === 'function') window.refreshUserList();
+    }
+
+    // Reset typing status UI in case it was stuck
+    if (typingIndicator) typingIndicator.style.display = 'none';
+
     // Cannot call the Global Room natively yet
     document.getElementById('start-audio-btn').style.display = userId === 'global' ? 'none' : 'inline-flex';
     document.getElementById('start-video-btn').style.display = userId === 'global' ? 'none' : 'inline-flex';
 
     // Clear old messages for now (since ephemeral and no DB per user built-in in this simple ui)
-    // In a real app we'd load previous messages. Filtering is tricky without persistence.
-    // We'll keep it as is, maybe just clear for demo so it looks fresh, or leave them.
     messagesList.innerHTML = '';
 };
 
@@ -324,6 +428,20 @@ window.appendMessage = function(fromName, message, type) { // type: 'sent' | 're
     
     messagesList.appendChild(li);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Browser Notification handle
+    if (type === 'received') {
+        // Play subtle sound
+        try { notifSound.play(); } catch(e){}
+
+        // If tab background, show browser notification
+        if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+            new Notification(`New message from ${fromName}`, {
+                body: message,
+                icon: '/assets/img/icon.png' // fallback if user has one
+            });
+        }
+    }
 };
 
 // Send Message Flow
@@ -337,6 +455,11 @@ messageForm.addEventListener('submit', (e) => {
             window.sendMessage(window.appState.selectedUser.id, msg);
         }
         
+        // Stop typing status immediately
+        window.appState.isTyping = false;
+        clearTimeout(window.appState.typingTimeout);
+        if (window.socket) window.socket.emit('stop-typing', { to: window.appState.selectedUser.id });
+
         messageInput.value = '';
     }
 });
@@ -356,4 +479,75 @@ window.startCallTimer = function() {
 window.stopCallTimer = function() {
     clearInterval(window.appState.callTimerInterval);
     callTimerDisplay.textContent = "00:00";
+};
+
+// Render file/image in chat
+window.appendFileMessage = function(fromName, fileName, fileType, fileData, type) {
+    const li = document.createElement('li');
+    li.className = `msg-wrapper ${type}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+
+    // Name label for global
+    if (type === 'received' && window.appState.selectedUser && window.appState.selectedUser.id === 'global') {
+        const nameSpan = document.createElement('div');
+        nameSpan.style.cssText = 'font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px; font-weight:bold;';
+        nameSpan.textContent = fromName;
+        bubble.appendChild(nameSpan);
+    }
+
+    if (fileType.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = fileData;
+        img.style.cssText = 'max-width:100%; border-radius:8px; display:block; cursor:pointer;';
+        img.onclick = () => window.open(fileData);
+        bubble.appendChild(img);
+    } else {
+        const link = document.createElement('a');
+        link.href = fileData;
+        link.download = fileName;
+        link.className = 'file-link';
+        link.style.cssText = 'color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:8px;';
+        link.innerHTML = `<i class="ri-file-line" style="font-size:1.5rem;"></i> <span>${fileName}</span>`;
+        bubble.appendChild(link);
+    }
+
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'msg-time';
+    timeSpan.textContent = time;
+
+    li.appendChild(bubble);
+    li.appendChild(timeSpan);
+    
+    messagesList.appendChild(li);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Notifications for files too
+    if (type === 'received') {
+        try { notifSound.play(); } catch(e){}
+        if (document.hidden && Notification.permission === "granted") {
+            new Notification(`New file from ${fromName}`, { body: fileName });
+        }
+    }
+};
+
+// Global Handlers for Socket events that affect the UI
+window.handleGlobalSocketEvents = function(socket) {
+    socket.on('user-typing', (data) => {
+        if (window.appState.selectedUser && window.appState.selectedUser.id === data.from) {
+            if (typingIndicator) typingIndicator.style.display = 'inline-block';
+        }
+    });
+
+    socket.on('user-stop-typing', (data) => {
+        if (window.appState.selectedUser && window.appState.selectedUser.id === data.from) {
+            if (typingIndicator) typingIndicator.style.display = 'none';
+        }
+    });
+
+    socket.on('message-seen', (data) => {
+        // Optional: show "Seen" badge logic if we want. For now, we clear unread statuses.
+    });
 };

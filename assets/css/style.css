@@ -159,8 +159,20 @@ button {
 }
 
 .btn-icon.accept { background: var(--success); }
-.btn-icon.reject, .btn-icon.end { background: var(--danger); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
-.btn-icon.reject:hover, .btn-icon.end:hover { background: var(--danger-hover); }
+.btn-icon.reject, .status-indicator.offline { background: #4b5563; }
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
 
 /* Modals */
 .modal-overlay {
@@ -451,6 +463,7 @@ button {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    transition: background 0.5s ease; /* Smooth wallpaper transition */
 }
 .messages-container.hidden { display: none !important; }
 

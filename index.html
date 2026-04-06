@@ -6,6 +6,12 @@
     <title>Fun Times - Personal Chat & Call</title>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Fun Times - Premium Chat</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#8b5cf6">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5968/5968756.png">
+    
     <!-- Icons -->
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
@@ -75,6 +81,7 @@
                 </div>
                 <button id="toggle-mute-btn" class="btn-icon"><i class="ri-mic-fill"></i></button>
                 <button id="toggle-video-btn" class="btn-icon"><i class="ri-camera-fill"></i></button>
+                <button id="toggle-screen-btn" class="btn-icon" title="Share Screen"><i class="ri-screen-share-line"></i></button>
                 <button id="end-call-btn" class="btn-icon end"><i class="ri-phone-fill"></i></button>
             </div>
         </div>
@@ -120,12 +127,24 @@
                     <div class="avatar" id="partner-avatar">?</div>
                     <div class="info">
                         <h2 id="partner-username">Select a User</h2>
-                        <span class="status-indicator"></span>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="status-indicator"></span>
+                            <span id="typing-indicator" style="font-size:0.75rem; color:var(--accent); font-style:italic; display:none;">is typing...</span>
+                        </div>
                     </div>
                 </div>
                 <div class="chat-actions">
-                    <button class="btn-icon default-icon" id="start-audio-btn" title="Audio Call"><i class="ri-phone-line"></i></button>
-                    <button class="btn-icon default-icon" id="start-video-btn" title="Video Call"><i class="ri-video-chat-line"></i></button>
+                    <button class="btn-icon" id="start-audio-btn" title="Audio Call"><i class="ri-phone-line"></i></button>
+                    <button class="btn-icon" id="start-video-btn" title="Video Call"><i class="ri-video-chat-line"></i></button>
+                    <div class="wallpaper-menu-wrap">
+                        <button class="btn-icon" id="wallpaper-menu-btn" title="Chat Wallpaper"><i class="ri-more-2-fill"></i></button>
+                        <div class="wallpaper-dropdown" id="wallpaper-dropdown">
+                            <div class="wallpaper-option" data-bg="var(--bg-main)" style="background:var(--bg-main);">Default</div>
+                            <div class="wallpaper-option" data-bg="linear-gradient(135deg, #1a1c2c 0%, #42194a 100%)" style="background:linear-gradient(135deg, #1a1c2c 0%, #42194a 100%);">Nebula</div>
+                            <div class="wallpaper-option" data-bg="linear-gradient(135deg, #09203f 0%, #537895 100%)" style="background:linear-gradient(135deg, #09203f 0%, #537895 100%);">Midnight</div>
+                            <div class="wallpaper-option" data-bg="linear-gradient(135deg, #13547a 0%, #80d0c7 100%)" style="background:linear-gradient(135deg, #13547a 0%, #80d0c7 100%);">Ocean</div>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -155,6 +174,8 @@
                 </div>
                 <form id="message-form" class="message-form">
                     <button type="button" class="btn-icon default-icon" id="emoji-btn" title="Add Emoji" style="background:transparent;"><i class="ri-emotion-line"></i></button>
+                    <label for="file-input" class="btn-icon default-icon" id="file-label" title="Attach File" style="background:transparent; cursor:pointer;"><i class="ri-attachment-2"></i></label>
+                    <input type="file" id="file-input" style="display:none;" accept="image/*,.pdf,.doc,.docx,.txt">
                     <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off">
                     <button type="submit" class="btn-icon primary"><i class="ri-send-plane-fill"></i></button>
                 </form>
@@ -166,5 +187,16 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="assets/js/socket_webrtc.js" defer></script>
     <script src="assets/js/app.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('SW registered!', reg);
+                }).catch(err => {
+                    console.log('SW registration failed:', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>
