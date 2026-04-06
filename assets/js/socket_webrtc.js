@@ -38,6 +38,48 @@ const filterEmojiBtn = document.getElementById('filter-emoji-btn');
 
 let incomingCallData = null; // Stores offer until accepted
 let pendingCandidates = [];
+let currentCallType = 'audio'; // 'audio' | 'video'
+
+// ── Ringtone (Web Audio API) ──────────────────────────────────────────────
+let ringtoneAudioCtx = null;
+let ringtoneInterval = null;
+
+function startRingtone() {
+    stopRingtone(); // prevent double
+    try {
+        ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { return; }
+
+    function beep() {
+        if (!ringtoneAudioCtx) return;
+        const osc = ringtoneAudioCtx.createOscillator();
+        const gain = ringtoneAudioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(ringtoneAudioCtx.destination);
+        osc.type = 'sine';
+        // Classic phone double-beep: 440Hz then 480Hz
+        osc.frequency.setValueAtTime(440, ringtoneAudioCtx.currentTime);
+        osc.frequency.setValueAtTime(480, ringtoneAudioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.3, ringtoneAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ringtoneAudioCtx.currentTime + 0.5);
+        osc.start(ringtoneAudioCtx.currentTime);
+        osc.stop(ringtoneAudioCtx.currentTime + 0.5);
+    }
+    beep();
+    ringtoneInterval = setInterval(beep, 1200);
+}
+
+function stopRingtone() {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+    if (ringtoneAudioCtx) {
+        try { ringtoneAudioCtx.close(); } catch(e) {}
+        ringtoneAudioCtx = null;
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────
 
 // Canvas Filter State
 let currentVideoFilter = 'none';
@@ -48,6 +90,19 @@ rawVideoElement.autoplay = true;
 rawVideoElement.playsInline = true;
 rawVideoElement.muted = true;
 let filterAnimationFrameId = null;
+
+// Show / hide filter buttons based on call type
+function updateFilterVisibility(isVideo) {
+    const filterWrap = document.querySelector('.filter-buttons-wrap');
+    if (filterWrap) {
+        filterWrap.style.display = isVideo ? 'flex' : 'none';
+    } else {
+        // Fallback: hide individual buttons
+        if (filterBwBtn) filterBwBtn.style.display = isVideo ? 'inline-flex' : 'none';
+        if (filterEmojiBtn) filterEmojiBtn.style.display = isVideo ? 'inline-flex' : 'none';
+        if (filterNoneBtn) filterNoneBtn.style.display = 'none'; // always start hidden
+    }
+}
 
 function processFilterFrame() {
     if (!rawVideoElement.videoWidth) {
@@ -199,6 +254,7 @@ window.connectSocket = function(username) {
         document.getElementById('incoming-avatar').textContent = data.callerName.charAt(0).toUpperCase();
         document.getElementById('incoming-type').innerHTML = `is <span class="accent-text">${data.callType}</span> calling you...`;
         incomingCallModal.classList.add('active');
+        startRingtone(); // 🔔 Ring!
     });
 
     socket.on('answer', async (data) => {
@@ -307,10 +363,12 @@ window.sendMessage = function(toId, message) {
 async function setupCall(targetId, type) { // type: 'audio'|'video'
     isCaller = true;
     currentCallTarget = targetId;
+    currentCallType = type;
     
     // Show overlay
     activeCallOverlay.classList.add('active');
     document.getElementById('call-partner').textContent = window.appState.selectedUser.name;
+    updateFilterVisibility(type === 'video');
     
     await initMedia(type === 'video');
     createPeerConnection();
@@ -339,13 +397,16 @@ startAudioBtn.addEventListener('click', () => {
 // 3. WebRTC Answering Call
 acceptCallBtn.addEventListener('click', async () => {
     incomingCallModal.classList.remove('active');
+    stopRingtone(); // 🔕 Stop ring
     if (!incomingCallData) return;
 
     isCaller = false;
     currentCallTarget = incomingCallData.caller;
+    currentCallType = incomingCallData.callType;
     
     activeCallOverlay.classList.add('active');
     document.getElementById('call-partner').textContent = incomingCallData.callerName;
+    updateFilterVisibility(incomingCallData.callType === 'video');
 
     await initMedia(incomingCallData.callType === 'video');
     createPeerConnection();
@@ -370,6 +431,7 @@ acceptCallBtn.addEventListener('click', async () => {
 
 rejectCallBtn.addEventListener('click', () => {
     incomingCallModal.classList.remove('active');
+    stopRingtone(); // 🔕 Stop ring
     if (incomingCallData) {
         socket.emit('call-ended', { target: incomingCallData.caller });
         incomingCallData = null;
@@ -466,10 +528,13 @@ function createPeerConnection() {
 
 function cleanupCall() {
     activeCallOverlay.classList.remove('active');
+    stopRingtone(); // safety — in case caller hungup before pick up
     window.stopCallTimer();
     pendingCandidates = [];
     currentVideoFilter = 'none';
     if(filterNoneBtn) filterNoneBtn.style.display = 'none';
+    // Re-hide filter buttons
+    updateFilterVisibility(false);
     
     if (filterAnimationFrameId) {
         cancelAnimationFrame(filterAnimationFrameId);

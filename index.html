@@ -66,12 +66,13 @@
                 <span class="call-duration" id="call-timer">00:00</span>
             </div>
             <div class="control-buttons">
-                <button id="filter-none-btn" class="btn-icon default-icon" title="Clear Filters" style="display:none;"><i class="ri-user-smile-line"></i></button>
-                <button id="filter-bw-btn" class="btn-icon default-icon" title="B&W Filter"><i class="ri-contrast-drop-2-line"></i></button>
-                <button id="filter-emoji-btn" class="btn-icon default-icon" title="Emoji Filter"><i class="ri-bear-smile-line"></i></button>
-                
-                <div style="width:1px; background:rgba(255,255,255,0.2); margin:0 5px;"></div>
-                
+                <!-- Filter buttons: video call only -->
+                <div class="filter-buttons-wrap" style="display:none; align-items:center; gap:10px;">
+                    <button id="filter-none-btn" class="btn-icon default-icon" title="Clear Filters" style="display:none;"><i class="ri-user-smile-line"></i></button>
+                    <button id="filter-bw-btn" class="btn-icon default-icon" title="B&W Filter"><i class="ri-contrast-drop-2-line"></i></button>
+                    <button id="filter-emoji-btn" class="btn-icon default-icon" title="Emoji Filter"><i class="ri-bear-smile-line"></i></button>
+                    <div class="filter-divider" style="width:1px; background:rgba(255,255,255,0.2); height:30px; margin:0 2px;"></div>
+                </div>
                 <button id="toggle-mute-btn" class="btn-icon"><i class="ri-mic-fill"></i></button>
                 <button id="toggle-video-btn" class="btn-icon"><i class="ri-camera-fill"></i></button>
                 <button id="end-call-btn" class="btn-icon end"><i class="ri-phone-fill"></i></button>
